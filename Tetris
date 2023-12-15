@@ -1,0 +1,700 @@
+import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Point;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import javax.swing.BorderFactory;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+public class Tetris extends JPanel {
+
+    ArrayList <Integer> nextBlockNumber = new ArrayList <Integer> ();
+    int score = 0;
+    int lineCleared = 0;
+    int currentBlockNumber = 7;
+    int holdBlockNumber = 7;
+    int rotationNumber = 0;
+    Point currentPosition = new Point(4, 0);
+    Point lastPosition = new Point(0, 0);
+    boolean end = false;
+    boolean hold = false;
+    boolean holdable = true;
+    boolean rotate = true;
+    boolean hardDrop = true;
+    boolean pause = false;
+    boolean tSpin = false;
+    Color[][] grid = new Color[21][12];
+    int[][] aiGrid = new int[21][12];
+    int[] heightStack = new int[10];
+    HashMap <Integer, Integer> changerX = new HashMap<Integer, Integer>();
+    HashMap <Integer, Integer> changerY = new HashMap<Integer, Integer>();
+
+    Point[][][] SuperRotationSystem = new Point[][][] {
+    {{new Point(-1,0), new Point(-1,-1), new Point(0,+2), new Point(-1,+2)},
+    {new Point(+1,0), new Point(+1,+1), new Point(0,-2), new Point(+1,-2)},
+    {new Point(+1,0), new Point(+1,-1), new Point(0,+2), new Point(+1,+2)},
+    {new Point(-1,0), new Point(-1,+1), new Point(0,-2), new Point(-1,-2)},
+    {new Point(+1,0), new Point(+1,-1), new Point(0,+2), new Point(+1,+2)},
+    {new Point(+1,0), new Point(+1,+1), new Point(0,-2), new Point(+1,-2)},
+    {new Point(-1,0), new Point(-1,-1), new Point(0,+2), new Point(-1,+2)},
+    {new Point(-1,0), new Point(-1,+1), new Point(0,-2), new Point(-1,-2)}},
+    {{new Point(-2,0), new Point(+1,0), new Point(-2,+1), new Point(+1,-2)},
+    {new Point(-1,0), new Point(+2,0), new Point(-1,-2), new Point(+2,+1)},
+    {new Point(+2,0), new Point(-1,0), new Point(+2,-1), new Point(-1,+2)},
+    {new Point(+1,0), new Point(-2,0), new Point(+1,+2), new Point(-2,-1)},
+    {new Point(-1,0), new Point(+2,0), new Point(-1,-2), new Point(+2,+1)},
+    {new Point(+2,0), new Point(-1,0), new Point(-1,+2), new Point(+1,-2)},
+    {new Point(+1,0), new Point(-2,0), new Point(+1,+2), new Point(-2,-1)},
+    {new Point(-2,0), new Point(+1,0), new Point(+1,-2), new Point(-2,+1)}}};
+    
+    Color[] TetrisColours = new Color[] {new Color(153,0,255), new Color(252,252,0), new Color(0,239,239), new Color(0,0,242), new Color(248,165,0), new Color(255,0,0), new Color(0,255,0), new Color(0,0,0), new Color(238,238,238), new Color(100,100,100)};
+    Color[] TetrisColoursFinal = new Color[] {new Color(153,0,255,125), new Color(252,252,0,125), new Color(0,239,239,125), new Color(0,0,242,125), new Color(248,165,0,125), new Color(255,0,0,125), new Color(0,255,0,125), new Color(0,0,0,125), new Color(238,238,238,125), new Color(100,100,100,125)};
+    Point[][][] Position = new Point[7][4][4];
+
+    private void positionSolver() {
+        Point[] OBlockRotations = new Point[] {new Point(0,0), new Point(0,1), new Point(1,0), new Point(1,1)};
+        Point[][] FirstNaturalPoint = new Point[][] {{new Point(0,2), new Point(-2,0), new Point(0,0), new Point(2,0)},{new Point(-1,1), new Point(1,1), new Point(-1,-1),
+             new Point(1,-1)},{new Point(-3,1), new Point(-1,1), new Point(1,1), new Point(3,1)},{new Point(-2,2), new Point(-2,0), new Point(0,0), new Point(2,0)},{new Point(2,2), 
+                new Point(-2,0), new Point(0,0), new Point(2,0)},{new Point(-2,2), new Point(0,2), new Point(0,0), new Point(2,0)},{new Point(0,2), new Point(2,2), new Point(-2,0), 
+                    new Point(0,0)}};
+        Point[][][] NaturalPoint = new Point[7][4][4];
+        for(int BlockType = 0; BlockType < 7; BlockType++){
+            for(int p = 0; p < 4; p++){
+              NaturalPoint[BlockType][0][p] = FirstNaturalPoint[BlockType][p];
+            }
+        }
+
+        for(int BlockType = 0; BlockType < 7; BlockType++){
+            for(int rotation = 1; rotation < 4; rotation++){
+                for(int position = 0; position < 4; position++){
+                    NaturalPoint[BlockType][rotation][position] = nextPoint(NaturalPoint[BlockType][rotation - 1][position]);
+                }
+            }
+        }
+
+        ArrayList<Integer> xInput = new ArrayList<Integer>(Arrays.asList(-3, -1, 1, 3, -2, 0, 2));
+        ArrayList<Integer> xSolve = new ArrayList<Integer>(Arrays.asList(0, 1, 2, 3, 0, 1, 2));
+
+        ArrayList<Integer> yInput = new ArrayList<Integer>(Arrays.asList(3, 1, -1, -3, 2, 0, -2));
+        ArrayList<Integer> ySolve = new ArrayList<Integer>(Arrays.asList(0, 1, 2, 3, 0, 1, 2));
+
+        for(int number = 0; number < 7; number++){
+            changerX.put(xInput.get(number) , xSolve.get(number));
+            changerY.put(yInput.get(number) , ySolve.get(number));
+        }
+
+        for(int BlockType = 0; BlockType < 7; BlockType++){
+            for(int rotation = 0; rotation < 4; rotation++){
+                for(int position = 0; position < 4; position++){
+                    Position[BlockType][rotation][position] = converter(NaturalPoint[BlockType][rotation][position]);
+                }
+            }
+        }
+
+        for(int rotation = 0; rotation < 4; rotation++){
+            for(int position = 0; position < 4; position++){
+                Position[1][rotation][position] = OBlockRotations[position];
+            }
+        }      
+    }
+
+    private Point nextPoint(Point tripleArrayPoint){
+        Point nextPosition = new Point(Math.abs(tripleArrayPoint.y), Math.abs(tripleArrayPoint.x));
+        if(tripleArrayPoint.x >= 0 && tripleArrayPoint.y >= 0) {
+            nextPosition = new Point(nextPosition.x, nextPosition.y * -1);
+        }
+        else if(tripleArrayPoint.x < 0 && tripleArrayPoint.y >= 0) {
+            nextPosition = new Point(nextPosition.x, nextPosition.y);
+        }
+        else if(tripleArrayPoint.x >= 0 && tripleArrayPoint.y < 0) {
+            nextPosition = new Point(nextPosition.x * -1, nextPosition.y * -1);
+        }
+        else if(tripleArrayPoint.x < 0 && tripleArrayPoint.y < 0) {
+            nextPosition = new Point(nextPosition.x * -1, nextPosition.y);
+        }
+        return nextPosition;
+    }
+
+
+    private Point converter(Point convert) {
+        Point converted = new Point(changerForX(convert.x),changerForY(convert.y));
+    return converted;
+    }
+
+    private int changerForX(int point) {
+        int xValue = changerX.get(point);
+        return xValue;
+    }
+
+        private int changerForY(int point) {
+        int yValue = changerY.get(point);
+        return yValue;
+    }
+
+    private void spawn() {
+        currentPosition = new Point(4, 0);
+        rotationNumber = 0;
+        if (currentBlockNumber == 7) {
+            for (int amount = 0; amount < 5; amount++) {
+                nextBlockNumber.add(randomiser(0, 6));
+            }
+        }
+        currentBlockNumber = nextBlockNumber.get(0);
+        nextBlockNumber.remove(0);
+        nextBlockNumber.add(randomiser(0, 6));
+        repaint();
+        lastPoint();
+    }
+
+    private void place() {
+        for (Point p: Position[currentBlockNumber][rotationNumber]) {
+            grid[p.y + currentPosition.y][p.x + currentPosition.x] = TetrisColours[currentBlockNumber];
+        }
+    }
+
+    private void clearLine(int lineNumber) {
+        for (int column = lineNumber - 1; column >= 0; column--)
+            for (int row = 11; row > 0; row--) {
+                grid[column + 1][row] = grid[column][row];
+            }
+    }
+
+    private void spaceCheck() {
+        int rowCleared = 0;
+        boolean space;
+        for (int column = 19; column > 1; column--) {
+            space = false;
+            for (int row = 11; row > 0; row--) {
+                if (grid[column][row] == TetrisColours[7]) {
+                    space = true;
+                }
+            }
+            if (!space) {
+                clearLine(column);
+                lineCleared++;
+                rowCleared++;
+                column++;
+            }
+        }
+        if (tSpin) {
+            switch (rowCleared) {
+                case 1:
+                    score += 800;
+                    break;
+
+                case 2:
+                    score += 1200;
+                    break;
+
+                case 3:
+                    score += 1600;
+                    break;
+            }
+        } else {
+            switch (rowCleared) {
+                case 1:
+                    score += 100;
+                    break;
+
+                case 2:
+                    score += 300;
+                    break;
+
+                case 3:
+                    score += 500;
+                    break;
+
+                case 4:
+                    score += 800;
+                    break;
+            }
+        }
+    }
+
+    private void restart() {
+        end = false;
+        hold = false;
+        holdable = true;
+        for (int number = 0; number < nextBlockNumber.size(); number++) {
+            nextBlockNumber.remove(0);
+        }
+        defaultGrid();
+        spawn();
+    }
+
+    private void softDrop() {
+        if (end == false) {
+            if (!collideReturnKeyMotion(currentPosition.x, currentPosition.y + 1, rotationNumber, currentBlockNumber)) {
+                currentPosition.y++;
+                lastPoint();
+            } else {
+                row: for (int row = 1; row < 11; row++) {
+                    if (grid[0][row] != TetrisColours[7]) {
+                        end = true;
+                        break row;
+                    }
+                }
+                if (end == false) {
+                    holdable = true;
+                    place();
+                    spawn();
+                    spaceCheck();
+                } else {
+                    for (int column = 0; column < 20; column++) {
+                        for (int row = 1; row < 11; row++) {
+                            if (grid[column][row] != TetrisColours[7]) {
+                                grid[column][row] = TetrisColours[9];
+                            }
+                        }
+                    }
+                }
+            }
+            repaint();
+        }
+    }
+
+    private void lastPoint() {
+        int finalDownPosition = 0;
+
+        for (int column = currentPosition.y; column < 20; column++) {
+            if (collideReturnKeyMotion(currentPosition.x, column, rotationNumber, currentBlockNumber)) {
+                finalDownPosition = column - 1;
+                break;
+            }
+        }
+
+        if (finalDownPosition == -1) {
+            finalDownPosition = 0;
+        }
+
+        lastPosition = new Point(currentPosition.x, finalDownPosition);
+    }
+
+    private void rotate() {
+        if (end == false && rotate == true) {
+            rotate = false;
+            int nextRotationNumber = rotationNumber + 1;
+            if (nextRotationNumber > 3) {
+                nextRotationNumber = 0;
+            }
+
+            if (currentBlockNumber != 1 && currentBlockNumber != 2) {
+                if (!collideReturnKeyMotion(currentPosition.x, currentPosition.y, nextRotationNumber, currentBlockNumber)) {
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber][0].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][0].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber][0].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][0].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber][1].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][1].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber][1].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][1].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber][2].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][2].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber][2].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][2].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();D
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber][3].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][3].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber][3].x, currentPosition.y + SuperRotationSystem[0][rotationNumber][3].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                }
+                if (currentPosition.x == lastPosition.x && currentPosition.y == lastPosition.y) {
+                    pause = true;
+                    if (currentBlockNumber == 0) {
+                        for (Point p: Position[currentBlockNumber][rotationNumber]) {
+                            if (grid[p.y + currentPosition.y - 1][p.x + currentPosition.x] != TetrisColours[7]) {
+                                tSpin = true;
+                            }
+                        }
+                    }
+                }
+            } else if (currentBlockNumber == 2) {
+                if (!collideReturnKeyMotion(currentPosition.x, currentPosition.y, nextRotationNumber, currentBlockNumber)) {
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber][0].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][0].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber][0].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][0].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber][1].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][1].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber][1].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][1].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber][2].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][2].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber][2].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][2].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber][3].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][3].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber][3].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][3].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                }
+            } else if (currentBlockNumber == 1) {
+                if (!collideReturnKeyMotion(currentPosition.x, currentPosition.y, nextRotationNumber, currentBlockNumber)) {
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                }
+            }
+        }
+    }
+
+    private void antiRotate() {
+        if (end == false && rotate == true) {
+            rotate = false;
+            int nextRotationNumber = rotationNumber - 1;
+            if (nextRotationNumber < 0) {
+                nextRotationNumber = 3;
+            }
+
+            if (currentBlockNumber != 1 && currentBlockNumber != 2) {
+                if (!collideReturnKeyMotion(currentPosition.x, currentPosition.y, nextRotationNumber, currentBlockNumber)) {
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][0].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][0].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][0].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][0].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][1].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][1].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][1].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][1].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][2].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][2].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][2].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][2].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][3].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][3].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[0][rotationNumber + 4][3].x, currentPosition.y + SuperRotationSystem[0][rotationNumber + 4][3].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                }
+                if (currentPosition.x == lastPosition.x && currentPosition.y == lastPosition.y) {
+                    pause = true;
+                    if (currentBlockNumber == 0) {
+                        for (Point p: Position[currentBlockNumber][rotationNumber]) {
+                            if (grid[p.y + lastPosition.y - 1][p.x + lastPosition.x] != TetrisColours[7]) {
+                                tSpin = true;
+                            }
+                        }
+                    }
+                }
+            } else if (currentBlockNumber == 2) {
+                if (!collideReturnKeyMotion(currentPosition.x, currentPosition.y, nextRotationNumber, currentBlockNumber)) {
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber + 4][0].x, currentPosition.y + SuperRotationSystem[1][rotationNumber + 4][0].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber + 4][0].x, currentPosition.y + SuperRotationSystem[1][rotationNumber + 4][0].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber + 4][1].x, currentPosition.y + SuperRotationSystem[1][rotationNumber + 4][1].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber][1].x, currentPosition.y + SuperRotationSystem[1][rotationNumber][1].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber + 4 + 4][2].x, currentPosition.y + SuperRotationSystem[1][rotationNumber + 4][2].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber + 4 + 4][2].x, currentPosition.y + SuperRotationSystem[1][rotationNumber + 4][2].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                } else if (!collideReturnKeyMotion(currentPosition.x + SuperRotationSystem[1][rotationNumber + 4][3].x, currentPosition.y + SuperRotationSystem[1][rotationNumber + 4][3].y, nextRotationNumber, currentBlockNumber)) {
+                    currentPosition = new Point(currentPosition.x + SuperRotationSystem[1][rotationNumber + 4][3].x, currentPosition.y + SuperRotationSystem[1][rotationNumber + 4][3].y);
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                }
+            } else if (currentBlockNumber == 1) {
+                if (!collideReturnKeyMotion(currentPosition.x, currentPosition.y, nextRotationNumber, currentBlockNumber)) {
+                    rotationNumber = nextRotationNumber;
+                    lastPoint();
+                    repaint();
+                }
+            }
+        }
+    }
+
+    private void across(int movement) {
+        if (end == false) {
+            if (!collideReturnKeyMotion(currentPosition.x + movement, currentPosition.y, rotationNumber, currentBlockNumber)) {
+                currentPosition.x += movement;
+                lastPoint();
+            }
+            repaint();
+        }
+    }
+
+    private void hold() {
+        if (end == false) {
+            if (holdable == true && hold == true) {
+                currentPosition = new Point(4, 0);
+                int currentBlockHold = currentBlockNumber;
+                currentBlockNumber = holdBlockNumber;
+                holdBlockNumber = currentBlockHold;
+                lastPoint();
+                repaint();
+                holdable = false;
+            }
+
+            if (holdable == true && hold == false) {
+                holdBlockNumber = currentBlockNumber;
+                lastPoint();
+                spawn();
+                hold = true;
+                holdable = false;
+            }
+        }
+    }
+
+    private boolean tSpin() {
+        return tSpin;
+    }
+
+    private void hardDrop() {
+        if (end == false && hardDrop == true) {
+            hardDrop = false;
+            lastPoint();
+
+            for (int number = 0; number < lastPosition.y + 1; number++) {
+                softDrop();
+                score++;
+            }
+
+            currentPosition = new Point(4, 0);
+        }
+    }
+
+    private boolean collideReturnKeyMotion(int x, int y, int spin, int blockType) {
+        for (Point p: Position[currentBlockNumber][spin]) {
+            if (grid[p.y + y][p.x + x] != TetrisColours[7]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void defaultGrid() {
+        for (int column = 0; column < 21; column++) {
+            for (int row = 0; row < 12; row++) {
+                if (row == 0 || row == 11 || column == 20) {
+                    grid[column][row] = TetrisColours[8];
+                } else {
+                    grid[column][row] = TetrisColours[7];
+                }
+            }
+        }
+
+        score = 0;
+        lineCleared = 0;
+        currentBlockNumber = 7;
+        holdBlockNumber = 7;
+        rotationNumber = 0;
+    }
+
+    @Override
+    public void paintComponent(Graphics g) {
+
+        g.setColor(TetrisColours[8]);
+        g.fillRect(0, 0, 1800, 1800);
+
+        g.setColor(TetrisColours[8]);
+        g.fillRect(230, 550, 200, 20);
+
+        g.setColor(TetrisColours[7]);
+        g.setFont(new Font("", Font.PLAIN, 13));
+        g.drawString("Score: " + score, 235, 565);
+
+        g.setColor(TetrisColours[8]);
+        g.fillRect(230, 580, 200, 20);
+
+        g.setColor(TetrisColours[7]);
+        g.setFont(new Font("", Font.PLAIN, 13));
+        g.drawString("Lines Cleared: " + lineCleared, 235, 595);
+
+        for (int row = 0; row < 12; row++) {
+            for (int column = 0; column < 21; column++) {
+                g.setColor(grid[column][row]);
+                g.fillRect(row * 25 + 145, column * 25 + 30, 25, 25);
+            }
+        }
+
+
+        g.setColor(TetrisColoursFinal[currentBlockNumber]);
+        for (Point p: Position[currentBlockNumber][rotationNumber]) {
+            g.fillRect((p.x + lastPosition.x) * 25 + 145, (p.y + lastPosition.y) * 25 + 30, 25, 25);
+        }
+
+
+        g.setColor(TetrisColours[currentBlockNumber]);
+        if (end == false) {
+            for (Point p: Position[currentBlockNumber][rotationNumber]) {
+                g.fillRect((p.x + currentPosition.x) * 25 + 145, (p.y + currentPosition.y) * 25 + 30, 25, 25);
+            }
+        } else {
+            g.setColor(TetrisColours[9]);
+            for (Point p: Position[currentBlockNumber][rotationNumber]) {
+                g.fillRect((p.x + currentPosition.x) * 25 + 145, (p.y + currentPosition.y) * 25 + 30, 25, 25);
+            }
+        }
+
+        for (int number = 0; number < 5; number++) {
+            g.setColor(TetrisColours[nextBlockNumber.get(number)]);
+            for (Point p: Position[nextBlockNumber.get(number)][0]) {
+                g.fillRect(p.x * 25 + 450, p.y * 25 + 50 + number * 80, 25, 25);
+            }
+        }
+
+        if (hold) {
+            g.setColor(TetrisColours[holdBlockNumber]);
+            for (Point p: Position[holdBlockNumber][0]) {
+                g.fillRect(p.x * 25 + 40, p.y * 25 + 50, 25, 25);
+            }
+        }
+    }
+
+    private int randomiser(int min, int max) {
+        return (int)((Math.random() * (max + 1 - min)) + min);
+    }
+
+    public static void main(String[] args) {
+        final Tetris tetris = new Tetris();
+        tetris.positionSolver();
+        tetris.defaultGrid();
+        tetris.spawn();
+        tetris.setSize(580, 650);
+
+        JPanel panel = new JPanel();
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+        panel.setLayout(new BorderLayout());
+        panel.setFocusable(true);
+        panel.requestFocus();
+        panel.add(tetris);
+
+        panel.addKeyListener(new KeyListener() {
+            public void keyTyped(KeyEvent e) {}
+
+            public void keyPressed(KeyEvent e) {
+                switch (e.getKeyCode()) {
+                    case KeyEvent.VK_UP:
+                        tetris.rotate();
+                        break;
+
+                    case KeyEvent.VK_LEFT:
+                        tetris.across(-1);
+                        break;
+
+                    case KeyEvent.VK_RIGHT:
+                        tetris.across(1);
+                        break;
+
+                    case KeyEvent.VK_DOWN:
+                        tetris.softDrop();
+                        tetris.score++;
+                        break;
+
+                    case KeyEvent.VK_W:
+                        tetris.rotate();
+                        break;
+
+                    case KeyEvent.VK_A:
+                        tetris.across(-1);
+                        break;
+
+                    case KeyEvent.VK_D:
+                        tetris.across(1);
+                        break;
+
+                    case KeyEvent.VK_S:
+                        tetris.softDrop();
+                        tetris.score++;
+                        break;
+
+                    case KeyEvent.VK_Z:
+                        tetris.antiRotate();
+                        break;
+
+                    case KeyEvent.VK_SPACE:
+                        tetris.hardDrop();
+                        break;
+
+                    case KeyEvent.VK_C:
+                        tetris.hold();
+                        break;
+
+                    case KeyEvent.VK_R:
+                        tetris.restart();
+                        break;
+
+                }
+            }
+
+            public void keyReleased(KeyEvent e) {
+                switch (e.getKeyCode()) {
+                    case KeyEvent.VK_UP:
+                        tetris.rotate = true;
+                        break;
+
+                    case KeyEvent.VK_W:
+                        tetris.rotate = true;
+                        break;
+
+                    case KeyEvent.VK_Z:
+                        tetris.rotate = true;
+                        break;
+
+                    case KeyEvent.VK_SPACE:
+                        tetris.hardDrop = true;
+                        break;
+                }
+            }
+        });
+
+        JFrame frame = new JFrame("Tetris");
+        frame.setTitle("Tetris");
+        frame.setSize(580, 650);
+        frame.add(panel, BorderLayout.CENTER);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setVisible(true);
+
+        new Thread() {
+            @Override public void run() {
+                while (true) {
+                    try {
+                        Thread.sleep(500);
+                        if (tetris.end == false) {
+                            if (tetris.pause == false) {
+                                tetris.softDrop();
+                            }
+                            if (!tetris.pause) {
+                                tetris.tSpin = false;
+                            }
+                            tetris.pause = false;
+                        }
+                    } catch (InterruptedException e) {}
+                }
+            }
+        }.start();
+    }
+}
